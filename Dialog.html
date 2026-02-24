@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body { font-family: sans-serif; padding: 20px; color: #333; }
+      /* カレンダー入力欄 */
+      input[type="date"] {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 20px;
+        font-size: 16px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      /* ボタン */
+      button { 
+        width: 100%; padding: 12px; background-color: #4CAF50; 
+        color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; 
+        transition: background-color 0.3s;
+      }
+      button:hover { background-color: #45a049; }
+      button:disabled { background-color: #ccc; cursor: not-allowed; }
+      
+      /* ローディング表示 */
+      .loader { display: none; text-align: center; color: #666; margin-top: 15px; font-size: 14px; }
+      
+      /* 結果表示エリア */
+      #resultArea { display: none; margin-top: 20px; padding: 15px; background-color: #f0f8ff; border-radius: 5px; border: 1px solid #cce5ff; }
+      .success-msg { color: #0056b3; font-weight: bold; margin-bottom: 10px; }
+      .drive-link { 
+        display: block; margin-top: 10px; padding: 10px; 
+        background-color: #fff; border: 1px solid #ddd; text-align: center; 
+        text-decoration: none; color: #d32f2f; font-weight: bold; border-radius: 4px;
+      }
+      .drive-link:hover { background-color: #fce8e8; }
+      .close-link { text-align: center; margin-top: 15px; font-size: 12px; }
+      .close-link a { color: #888; text-decoration: underline; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <h3>日報一括出力</h3>
+    <p>処理する日付を選択してください：</p>
+    
+    <div id="inputArea">
+      <input type="date" id="datePicker">
+      <button onclick="runProcess()">実行</button>
+    </div>
+    
+    <div id="status" class="loader">
+      <div style="margin-bottom:5px;">⏳ 処理中...</div>
+      <small>PDF作成・ZIP圧縮を行っています。<br>このままお待ちください。</small>
+    </div>
+    
+    <div id="resultArea">
+      <div class="success-msg" id="msgText"></div>
+      <p style="font-size:13px;">以下のボタンからGoogleドライブを開いてダウンロードしてください。</p>
+      
+      <a id="driveLinkBtn" href="#" target="_blank" class="drive-link">
+        📂 Googleドライブで開く
+      </a>
+      
+      <div class="close-link">
+        <a onclick="google.script.host.close()">閉じる</a>
+      </div>
+    </div>
+
+    <script>
+      // 初期化：今日の日付をセット
+      window.onload = function() {
+        const dateInput = document.getElementById('datePicker');
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        dateInput.value = `${yyyy}-${mm}-${dd}`;
+      };
+
+      function runProcess() {
+        const selectedDate = document.getElementById('datePicker').value;
+        if (!selectedDate) {
+          alert("日付を選択してください。");
+          return;
+        }
+
+        // UI切り替え
+        const statusDiv = document.getElementById('status');
+        const btn = document.querySelector('button');
+        const resultArea = document.getElementById('resultArea');
+        const inputArea = document.getElementById('inputArea');
+        
+        statusDiv.style.display = 'block';
+        resultArea.style.display = 'none';
+        btn.disabled = true;
+        btn.innerHTML = '実行中...';
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            statusDiv.style.display = 'none';
+            btn.innerHTML = '実行';
+
+            if (result.success) {
+              // 成功時の表示切り替え
+              inputArea.style.display = 'none'; // 入力欄を隠す
+              resultArea.style.display = 'block';
+              
+              document.getElementById('msgText').innerText = result.message;
+              
+              // リンクの設定
+              const linkBtn = document.getElementById('driveLinkBtn');
+              linkBtn.href = result.driveUrl;
+              linkBtn.innerText = `📂 ${result.filename} を開く`;
+              
+            } else {
+              // エラー時（データなし等）
+              alert(result.message);
+              btn.disabled = false;
+            }
+          })
+          .withFailureHandler(function(err) {
+            alert('システムエラーが発生しました: ' + err);
+            statusDiv.style.display = 'none';
+            btn.disabled = false;
+            btn.innerHTML = '実行';
+          })
+          .processDailyReports(selectedDate);
+      }
+    </script>
+  </body>
+</html>
